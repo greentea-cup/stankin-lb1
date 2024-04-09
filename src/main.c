@@ -22,12 +22,45 @@ size_t npow2(size_t v) {
     return v;
 }
 
-// returns 1 on success, 0 on failure
+// returns 1 on success and result in out_result, 0 on failure
 // success if str is in format /^\+?[0-9]+\s*$/
-int parse_uint(char *str, size_t *result) {
-    return 0;
+int parse_uint(char *str, size_t *out_result) {
+    if (str == NULL || str[0] == '\0' || out_result == NULL) return 0;
+    if (str[0] == '+') str++;
+    size_t res = 0;
+    while (*str != '\0') {
+        if (*str >= '0' && *str <= '9') {
+            res *= 10;
+            res += *str - '0';
+            str++;
+        }
+        else if (strchr(" \n\t", *str) != NULL) { break; }
+        else { return 0; }
+    }
+    *out_result = res;
+    return 1;
 }
 
+// returns 1 on success and result in out_result, 0 on failure
+// success if str is in format /^(\+|-)?[0-9]+\s*$/
+int parse_int(char *str, size_t *out_result) {
+    if (str == NULL || str[0] == '\0' || out_result == NULL) return 0;
+    int neg = 0;
+    if (str[0] == '+') str++;
+    else if (str[0] == '-') (neg = 1, str++);
+    size_t res = 0;
+    while (*str != '\0') {
+        if (*str >= '0' && *str <= '9') {
+            res *= 10;
+            res += *str - '0';
+            str++;
+        }
+        else if (strchr(" \n\t", *str) != NULL) { break; }
+        else { return 0; }
+    }
+    *out_result = neg ? -res : res;
+    return 1;
+}
 typedef struct {
     size_t id;
     int64_t c1;
@@ -67,7 +100,7 @@ void table_free(table_t *table) {
 }
 
 int main(void) {
-    FILE *fin = stdin; // no free
+    FILE *fin = stdin;   // no free
     FILE *fout = stdout; // no free
     FILE *ferr = stderr; // no free
     table_t *table = NULL;
@@ -96,6 +129,7 @@ int main(void) {
                 fgets(line, MAX_LINE_SIZE, fin);
                 if (parse_uint(line, &nrows) && nrows != 0) break;
             } while (1);
+            fprintf(fout, "%zu\n", nrows);
             for (size_t i = 0; i < nrows; i++) {
                 fprintf(fout, "[%zu]:\n", i);
                 // get each field on its line
