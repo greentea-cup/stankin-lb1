@@ -4,7 +4,7 @@
 #### Linux
 ---
 ```bash
-./regen-cmake.sh
+./regen_cmake.sh
 ./release.sh
 ```
 
