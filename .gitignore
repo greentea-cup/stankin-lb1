@@ -1,4 +1,6 @@
 **/Build
+**/.obsidian
+**/.vs
 **/.ccls-cache
 **/compile_commands.json
 **/"'"
