@@ -10,8 +10,7 @@
 #define MAX_LINE_SIZE 1024
 #endif
 
-#define afprintf(stream, ...)                                                                      \
-	if (stream != NULL) fprintf(stream, __VA_ARGS__)
+#define afprintf(stream, ...) if (stream != NULL) fprintf(stream, __VA_ARGS__)
 
 size_t npow2(size_t v) {
 	v--;
@@ -123,7 +122,7 @@ typedef struct {
 table_t *table_new(size_t cap) {
 	size_t cap2 = npow2(cap);
 	if (cap2 < cap || cap2 == 0) goto bad_cap;
-	table_t *table = malloc(1 * sizeof(table_t));
+	table_t *table = malloc(sizeof(table_t));
 	if (table == NULL) goto no_table;
 	dbrow_t *rows = calloc(cap2, sizeof(dbrow_t));
 	if (rows == NULL) goto no_rows;
@@ -182,7 +181,8 @@ int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int m
 		if (parse_int(line, &row.c1) == 1) { break; }
 		else if (manual) { afprintf(ferr, "c1: Int expected\nc1:\n"); }
 		else { goto bad_c1; }
-	} while (manual);
+	}
+	while (manual);
 
 	// double c2; // todo: find some float64_t
 	afprintf(fout, "c2[float]: ");
@@ -191,7 +191,8 @@ int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int m
 		if (parse_float(line, &row.c2) == 1) { break; }
 		else if (manual) { afprintf(ferr, "c2: Float expected\nc2:\n"); }
 		else { goto bad_c2; }
-	} while (manual);
+	}
+	while (manual);
 
 	// char c3[16]; a-zA-Z0-9
 	afprintf(fout, "c3[char 16]: ");
@@ -200,7 +201,7 @@ int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int m
 		int good = 1;
 		for (size_t i = 0; i < MAX_LINE_SIZE && line[i] != '\0' && line[i] != '\n'; i++) {
 			if (!((line[i] >= '0' && line[i] <= '9') || (line[i] >= 'a' && line[i] <= 'z') ||
-				  (line[i] >= 'A' && line[i] <= 'Z')) ||
+					(line[i] >= 'A' && line[i] <= 'Z')) ||
 				i >= 16) {
 				good = 0;
 				break;
@@ -218,7 +219,8 @@ int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int m
 			afprintf(ferr, "c3: Max length: 16; Valid chars are 0-9 a-z A-Z\nc3: ");
 		}
 		else { goto bad_c3; }
-	} while (manual);
+	}
+	while (manual);
 
 	// bool c4;
 	afprintf(fout, "c4[bool]: ");
@@ -246,7 +248,8 @@ int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int m
 		}
 		else if (manual) { afprintf(ferr, "c4: ON|OFF|0|1\nc4:\n"); }
 		else { goto bad_c4; }
-	} while (manual);
+	}
+	while (manual);
 
 	// char c5[32];
 	afprintf(fout, "c5[char 32]: ");
@@ -255,7 +258,7 @@ int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int m
 		int good = 1;
 		for (size_t i = 0; i < MAX_LINE_SIZE && line[i] != '\0' && line[i] != '\n'; i++) {
 			if (!((line[i] >= '0' && line[i] <= '9') || (line[i] >= 'a' && line[i] <= 'z') ||
-				  (line[i] >= 'A' && line[i] <= 'Z') || line[i] == ' ') ||
+					(line[i] >= 'A' && line[i] <= 'Z') || line[i] == ' ') ||
 				i >= 32) {
 				good = 0;
 				break;
@@ -272,7 +275,8 @@ int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int m
 			afprintf(ferr, "c5: Max length: 31; Valid chars are 0-9 a-z A-Z \\s\nc5: ");
 		}
 		else { goto bad_c5; }
-	} while (manual);
+	}
+	while (manual);
 
 	table_append(table, row);
 
@@ -314,7 +318,7 @@ int dump_table(FILE *fout, FILE *ferr, table_t *table) {
 
 int load_table(FILE *fin, FILE *ferr, table_t **out_table, char *line) {
 	// no error checking
-	size_t table_len, table_next_id;
+	size_t table_len = 0, table_next_id = 0;
 	fgets(line, MAX_LINE_SIZE, fin);
 	parse_uint(line, &table_len);
 	fgets(line, MAX_LINE_SIZE, fin);
@@ -330,7 +334,6 @@ int main(void) {
 	FILE *fin = stdin;	 // no free
 	FILE *fout = stdout; // no free
 	FILE *ferr = stderr; // no free
-	afprintf(fout, "HELLO!\n");
 	table_t *table = NULL;
 	char line[MAX_LINE_SIZE] = {0};
 	while (1) {
@@ -356,7 +359,8 @@ int main(void) {
 				afprintf(fout, "Row count: ");
 				fgets(line, MAX_LINE_SIZE, fin);
 				if (parse_uint(line, &nrows) && nrows != 0) break;
-			} while (1);
+			}
+			while (1);
 			if (table != NULL) table_free(table);
 			table = table_new(nrows);
 			afprintf(fout, "%zu rows\n", nrows);
@@ -401,12 +405,13 @@ int main(void) {
 				fsave = fopen(line, "w");
 				if (fsave == NULL) { afprintf(fout, "Cannot open file '%s'\n", line); }
 				else break;
-			} while (1);
+			}
+			while (1);
 			afprintf(fout, "Saving current table to '%s'\n", line);
 			dump_table(fsave, ferr, table);
 			afprintf(fout, "Saved current table\n");
 			if (fsave != NULL) fclose(fsave);
-		save_cancel:;
+save_cancel:;
 		}
 		else if (strlen(line) == 5 && !strncmp("load\n", line, 5)) {
 			FILE *fload = NULL;
@@ -423,12 +428,13 @@ int main(void) {
 				fload = fopen(line, "r");
 				if (fload == NULL) { afprintf(fout, "Cannot open file '%s'\n", line); }
 				else break;
-			} while (1);
+			}
+			while (1);
 			afprintf(fout, "Loading table from '%s'\n", line);
 			load_table(fload, ferr, &table, line);
 			afprintf(fout, "Loaded current table\n");
 			if (fload != NULL) fclose(fload);
-		load_cancel:;
+load_cancel:;
 		}
 		else {
 			afprintf(fout, "%s", line); // contains \n
