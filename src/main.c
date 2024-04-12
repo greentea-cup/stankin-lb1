@@ -160,42 +160,104 @@ void table_free(table_t *table) {
 	free(table);
 }
 
+// get_*
+/*
+ * manual = 1 if interactive input
+ * returns 1 on success, 0 on failure
+ */
+int get_uint(FILE *fin, FILE *fout, FILE *ferr, char *line, char const *prompt, char const *onerror, int manual, size_t *out_result) {
+	if (fin == NULL || out_result == NULL) return 0;
+	do {
+		if (prompt != NULL) afprintf(fout, "%s", prompt);
+		fgets(line, MAX_LINE_SIZE, fin);
+		if (parse_uint(line, out_result) == 0) {
+			if (manual) { if (onerror != NULL) afprintf(ferr, "%s", onerror); }
+			else { return 0; }
+		}
+	}
+	while (manual);
+	return 1;
+}
+
+int get_int(FILE *fin, FILE *fout, FILE *ferr, char *line, char const *prompt, char const *onerror, int manual, int64_t *out_result) {
+	if (fin == NULL || out_result == NULL) return 0;
+	do {
+		if (prompt != NULL) afprintf(fout, "%s", prompt);
+		fgets(line, MAX_LINE_SIZE, fin);
+		if (parse_int(line, out_result) == 0) {
+			if (manual) { if (onerror != NULL) afprintf(ferr, "%s", onerror); }
+			else { return 0; }
+		}
+	}
+	while (manual);
+	return 1;
+}
+
+int get_float(FILE *fin, FILE *fout, FILE *ferr, char *line, char const *prompt, char const *onerror, int manual, double *out_result) {
+	if (fin == NULL || out_result == NULL) return 0;
+	do {
+		if (prompt != NULL) afprintf(fout, "%s", prompt);
+		fgets(line, MAX_LINE_SIZE, fin);
+		if (parse_float(line, out_result) == 0) {
+			if (manual) { if (onerror != NULL) afprintf(ferr, "%s", onerror); }
+			else { return 0; }
+		}
+	}
+	while (manual);
+	return 1;
+}
+
+int get_bool(FILE *fin, FILE *fout, FILE *ferr, char *line, char const *prompt, char const *onerror, int manual, bool *out_result) {
+	if (fin == NULL || out_result == NULL) return 0;
+	do {
+		if (prompt != NULL) afprintf(fout, "%s", prompt);
+		fgets(line, MAX_LINE_SIZE, fin);
+		if (PROMPT("") || PROMPT("0") || PROMPT("F") || PROMPT("f")
+			|| PROMPT("OFF") || PROMPT("off")
+			|| PROMPT("FALSE") || PROMPT("false")) {
+			*out_result = 0;
+			break;
+		}
+		else if (PROMPT("1") || PROMPT("T") || PROMPT("t")
+			|| PROMPT("ON") || PROMPT("on")
+			|| PROMPT("TRUE") || PROMPT("true")) {
+			*out_result = 1;
+			break;
+		}
+		else if (manual) {
+			afprintf(ferr, "%s", onerror);
+		}
+		else { return 0; }
+
+	}
+	while (manual);
+	return 1;
+}
+// end get_*
+
+/*
+ * manual = 1 if interactive input
+ * returns 1 on success, 0 on failure
+ */
 int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int manual) {
 	size_t id;
 	if (manual) { id = table->next_id++; }
-	else {
-		afprintf(fout, "id[uint]: ");
-		fgets(line, MAX_LINE_SIZE, fin);
-		if (parse_uint(line, &id) == 0) {
-			afprintf(ferr, "Bad id; using auto\n");
-			return 0;
-		}
+	else if (get_uint(fin, fout, ferr, line, "id[uint]: ", "id: Uint expected\n", manual, &id) == 0) {
+		goto bad_id;
 	}
 	dbrow_t row = {0};
 
 	// int64_t c1;
-	afprintf(fout, "c1[int]: ");
-	do {
-		fgets(line, MAX_LINE_SIZE, fin);
-		if (parse_int(line, &row.c1) == 1) { break; }
-		else if (manual) { afprintf(ferr, "c1: Int expected\nc1:\n"); }
-		else { goto bad_c1; }
-	}
-	while (manual);
-
+	if (get_int(
+			fin, fout, ferr, line, "c1[int]: ", "c1: Int expected\n", manual, &row.c1
+		) == 0) { goto bad_c1; }
 	// double c2; // todo: find some float64_t
-	afprintf(fout, "c2[float]: ");
-	do {
-		fgets(line, MAX_LINE_SIZE, fin);
-		if (parse_float(line, &row.c2) == 1) { break; }
-		else if (manual) { afprintf(ferr, "c2: Float expected\nc2:\n"); }
-		else { goto bad_c2; }
-	}
-	while (manual);
-
+	if (get_float(
+			fin, fout, ferr, line, "c2[float]: ", "c2: Float expected\n", manual, &row.c2
+		) == 0) { goto bad_c2; }
 	// char c3[16+1]; a-zA-Z0-9
-	afprintf(fout, "c3[char 16]: ");
 	do {
+		afprintf(fout, "c3[char 16]: ");
 		fgets(line, MAX_LINE_SIZE, fin);
 		int good = 1;
 		for (size_t i = 0; i < MAX_LINE_SIZE && line[i] != '\0' && line[i] != '\n'; i++) {
@@ -215,40 +277,20 @@ int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int m
 			break;
 		}
 		else if (manual) {
-			afprintf(ferr, "c3: Max length: 16; Valid chars are 0-9 a-z A-Z\nc3: ");
+			afprintf(ferr, "c3: Max length: 16; Valid chars are 0-9 a-z A-Z\n");
 		}
 		else { goto bad_c3; }
 	}
 	while (manual);
 
 	// bool c4;
-	do {
-		afprintf(fout, "c4[bool]: ");
-		fgets(line, MAX_LINE_SIZE, fin);
-		if (PROMPT("") || PROMPT("0") || PROMPT("F") || PROMPT("f")
-			|| PROMPT("OFF") || PROMPT("off")
-			|| PROMPT("FALSE") || PROMPT("false")) {
-			row.c4 = 0;
-			break;
-		}
-		else if (PROMPT("1") || PROMPT("T") || PROMPT("t")
-			|| PROMPT("ON") || PROMPT("on")
-			|| PROMPT("TRUE") || PROMPT("true")) {
-			row.c4 = 1;
-			break;
-		}
-		else if (manual) {
-			afprintf(ferr, "c4: Valid options are: "
-				"<blank = 0> 0 1 T[RUE] F[ALSE] t[rue] f[alse] ON OFF on off\n"
-			);
-		}
-		else { goto bad_c4; }
-	}
-	while (manual);
-
+    if (get_bool(
+        fin, fout, ferr, line, "c4[bool]: ", "c4: Valid options are: "
+        "<blank = 0> 0 1 T[RUE] F[ALSE] t[rue] f[alse] ON OFF on off\n", manual, &row.c4
+        ) == 0) { goto bad_c4; }
 	// char c5[32+1];
-	afprintf(fout, "c5[char 32]: ");
 	do {
+		afprintf(fout, "c5[char 32]: ");
 		fgets(line, MAX_LINE_SIZE, fin);
 		int good = 1;
 		for (size_t i = 0; i < MAX_LINE_SIZE && line[i] != '\0' && line[i] != '\n'; i++) {
@@ -269,7 +311,7 @@ int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int m
 			break;
 		}
 		else if (manual) {
-			afprintf(ferr, "c5: Max length: 31; Valid chars are 0-9 a-z A-Z \\s\nc5: ");
+			afprintf(ferr, "c5: Max length: 31; Valid chars are 0-9 a-z A-Z \\s\n");
 		}
 		else { goto bad_c5; }
 	}
@@ -281,6 +323,7 @@ bad_c4:
 bad_c3:
 bad_c2:
 bad_c1:
+bad_id:
 	return 0;
 }
 
