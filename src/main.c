@@ -10,7 +10,10 @@
 #define MAX_LINE_SIZE 1024
 #endif
 
-#define afprintf(stream, ...) if (stream != NULL) fprintf(stream, __VA_ARGS__)
+// Note: both gcc and clang optimize away strlen calls on static string literals
+// msvc does it only with /O2, so x64-debug may be a bit unoptimized
+#define PROMPT(x) (strlen(line) == strlen(x "\n") && !strncmp(x "\n", line, strlen(x "\n")))
+#define afprintf(stream, ...) { if (stream != NULL) fprintf(stream, __VA_ARGS__); }
 
 size_t npow2(size_t v) {
 	v--;
@@ -24,17 +27,17 @@ size_t npow2(size_t v) {
 	return v;
 }
 
-// returns 1 on success and result in out_result, 0 on failure
-// success if str is in format /^\+?[0-9]+\s*$/
+/*
+ * returns 1 on success and result in out_result, 0 on failure
+ * success if str is in format /^\+?[0-9]+\s*$/
+ */
 int parse_uint(char *str, size_t *out_result) {
 	if (str == NULL || str[0] == '\0' || out_result == NULL) return 0;
 	if (str[0] == '+') str++;
 	size_t res = 0;
 	while (*str != '\0') {
 		if (*str >= '0' && *str <= '9') {
-			res *= 10;
-			res += *str;
-			res -= 48;
+			res = res * 10 + *str - '0';
 			str++;
 		}
 		else if (strchr(" \n\t", *str) != NULL) { break; }
@@ -44,19 +47,19 @@ int parse_uint(char *str, size_t *out_result) {
 	return 1;
 }
 
-// returns 1 on success and result in out_result, 0 on failure
-// success if str is in format /^(\+|-)?[0-9]+\s*$/
+/*
+ * returns 1 on success and result in out_result, 0 on failure
+ * success if str is in format /^(\+|-)?[0-9]+\s*$/
+ */
 int parse_int(char *str, int64_t *out_result) {
 	if (str == NULL || str[0] == '\0' || out_result == NULL) return 0;
 	int neg = 0;
 	if (str[0] == '+') str++;
-	else if (str[0] == '-') (neg = 1, str++);
+	else if (str[0] == '-') { neg = 1, str++; };
 	int64_t res = 0;
 	while (*str != '\0') {
 		if (*str >= '0' && *str <= '9') {
-			res *= 10;
-			res += *str;
-			res -= 48;
+			res = res * 10 + *str - '0';
 			str++;
 		}
 		else if (strchr(" \n\t", *str) != NULL) { break; }
@@ -70,13 +73,11 @@ int parse_float(char *str, double *out_result) {
 	if (str == NULL || str[0] == '\0' || out_result == NULL) return 0;
 	int neg = 0;
 	if (str[0] == '+') str++;
-	else if (str[0] == '-') (neg = 1, str++);
+	else if (str[0] == '-')(neg = 1, str++);
 	size_t full = 0, dec = 0, dv = 1;
 	while (*str != '\0') {
 		if (*str >= '0' && *str <= '9') {
-			full *= 10;
-			full += *str;
-			full -= 48;
+			full = full * 10 + *str - '0';
 			str++;
 		}
 		else if (*str == '.') { break; }
@@ -87,10 +88,8 @@ int parse_float(char *str, double *out_result) {
 		str++;
 		while (*str != '\0') {
 			if (*str >= '0' && *str <= '9') {
-				dec *= 10;
 				dv *= 10;
-				dec += *str;
-				dec -= 48;
+				dec = dec * 10 + *str - '0';
 				str++;
 			}
 			else if (strchr(" \n\t", *str) != NULL) { break; }
@@ -110,7 +109,7 @@ typedef struct {
 	bool c4;
 	char c5[33];
 } dbrow_t;
-#define ROW_FMT(row) row.id, row.c1, row.c2, row.c3, row.c4, row.c5
+#define ROW_ARG(row) row.id, row.c1, row.c2, row.c3, row.c4, row.c5
 
 typedef struct {
 	dbrow_t *rows;
@@ -172,7 +171,7 @@ int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int m
 			return 0;
 		}
 	}
-	dbrow_t row;
+	dbrow_t row = {0};
 
 	// int64_t c1;
 	afprintf(fout, "c1[int]: ");
@@ -194,15 +193,16 @@ int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int m
 	}
 	while (manual);
 
-	// char c3[16]; a-zA-Z0-9
+	// char c3[16+1]; a-zA-Z0-9
 	afprintf(fout, "c3[char 16]: ");
 	do {
 		fgets(line, MAX_LINE_SIZE, fin);
 		int good = 1;
 		for (size_t i = 0; i < MAX_LINE_SIZE && line[i] != '\0' && line[i] != '\n'; i++) {
-			if (!((line[i] >= '0' && line[i] <= '9') || (line[i] >= 'a' && line[i] <= 'z') ||
-					(line[i] >= 'A' && line[i] <= 'Z')) ||
-				i >= 16) {
+			if (i >= 16
+				|| !((line[i] >= '0' && line[i] <= '9')
+					|| (line[i] >= 'a' && line[i] <= 'z')
+					|| (line[i] >= 'A' && line[i] <= 'Z'))) {
 				good = 0;
 				break;
 			}
@@ -210,9 +210,8 @@ int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int m
 		size_t end = 0;
 		while (end < MAX_LINE_SIZE - 1 && line[end] != '\0' && line[end] != '\n') end++;
 		if (good) {
-			strncpy(row.c3, line, end);
-			afprintf(fout, "c3 end = %zu\n", end);
-			row.c3[end] = '\0';
+			strncpy(row.c3, line, end); // end-1 chars ok; last char = \n
+			row.c3[end] = '\0'; // replace last char with \0
 			break;
 		}
 		else if (manual) {
@@ -223,43 +222,41 @@ int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int m
 	while (manual);
 
 	// bool c4;
-	afprintf(fout, "c4[bool]: ");
 	do {
+		afprintf(fout, "c4[bool]: ");
 		fgets(line, MAX_LINE_SIZE, fin);
-		if (strlen(line) == 1 && !strncmp("\n", line, 1)) {
+		if (PROMPT("") || PROMPT("0") || PROMPT("F") || PROMPT("f")
+			|| PROMPT("OFF") || PROMPT("off")
+			|| PROMPT("FALSE") || PROMPT("false")) {
 			row.c4 = 0;
 			break;
 		}
-		else if (strlen(line) == 2 && !strncmp("0\n", line, 2)) {
-			row.c4 = 0;
-			break;
-		}
-		else if (strlen(line) == 2 && !strncmp("1\n", line, 2)) {
+		else if (PROMPT("1") || PROMPT("T") || PROMPT("t")
+			|| PROMPT("ON") || PROMPT("on")
+			|| PROMPT("TRUE") || PROMPT("true")) {
 			row.c4 = 1;
 			break;
 		}
-		else if (strlen(line) == 3 && !strncmp("ON\n", line, 3)) {
-			row.c4 = 1;
-			break;
+		else if (manual) {
+			afprintf(ferr, "c4: Valid options are: "
+				"<blank = 0> 0 1 T[RUE] F[ALSE] t[rue] f[alse] ON OFF on off\n"
+			);
 		}
-		else if (strlen(line) == 4 && !strncmp("OFF\n", line, 4)) {
-			row.c4 = 0;
-			break;
-		}
-		else if (manual) { afprintf(ferr, "c4: ON|OFF|0|1\nc4:\n"); }
 		else { goto bad_c4; }
 	}
 	while (manual);
 
-	// char c5[32];
+	// char c5[32+1];
 	afprintf(fout, "c5[char 32]: ");
 	do {
 		fgets(line, MAX_LINE_SIZE, fin);
 		int good = 1;
 		for (size_t i = 0; i < MAX_LINE_SIZE && line[i] != '\0' && line[i] != '\n'; i++) {
-			if (!((line[i] >= '0' && line[i] <= '9') || (line[i] >= 'a' && line[i] <= 'z') ||
-					(line[i] >= 'A' && line[i] <= 'Z') || line[i] == ' ') ||
-				i >= 32) {
+			if (i >= 32
+				|| !((line[i] >= '0' && line[i] <= '9')
+					|| (line[i] >= 'a' && line[i] <= 'z')
+					|| (line[i] >= 'A' && line[i] <= 'Z')
+					|| line[i] == ' ')) {
 				good = 0;
 				break;
 			}
@@ -267,7 +264,7 @@ int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int m
 		size_t end = 0;
 		while (end < MAX_LINE_SIZE - 1 && line[end] != '\0' && line[end] != '\n') end++;
 		if (good) {
-			strncpy(row.c5, line, end);
+			strncpy(row.c5, line, end); // same as c3
 			row.c5[end] = '\0';
 			break;
 		}
@@ -277,11 +274,8 @@ int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int m
 		else { goto bad_c5; }
 	}
 	while (manual);
-
 	table_append(table, row);
-
 	return 1;
-
 bad_c5:
 bad_c4:
 bad_c3:
@@ -290,28 +284,23 @@ bad_c1:
 	return 0;
 }
 
-int print_table(FILE *fout, FILE *ferr, table_t *table) {
+int print_table(FILE *fout, FILE *ferr, table_t *table, int dump) {
+	char const *HUMAN_FORMAT = "%zu\t%zd\t%f\t'%s'\t%d\t'%s'\n";
+	char const *DUMP_FORMAT = "%zu\n%zd\n%f\n%s\n%d\n%s\n";
+	char const *fmt = dump ? DUMP_FORMAT : HUMAN_FORMAT;
 	if (table == NULL || table->rows == NULL) {
 		afprintf(ferr, "No table\n");
 		return 0;
 	}
-	afprintf(fout, "id\tc1\tc2\tc3\tc4\tc5\n");
+	if (dump) {
+		afprintf(fout, "%zu\n%zu\n", table->len, table->next_id);
+	}
+	else {
+		afprintf(fout, "id\tc1\tc2\tc3\tc4\tc5\n");
+	}
 	for (size_t i = 0; i < table->len; i++) {
 		dbrow_t row = table->rows[i];
-		afprintf(fout, "%zu\t%zd\t%f\t'%s'\t%d\t'%s'\n", ROW_FMT(row));
-	}
-	return 1;
-}
-
-int dump_table(FILE *fout, FILE *ferr, table_t *table) {
-	if (table == NULL || table->rows == NULL) {
-		afprintf(ferr, "No table\n");
-		return 0;
-	}
-	afprintf(fout, "%zu\n%zu\n", table->len, table->next_id);
-	for (size_t i = 0; i < table->len; i++) {
-		dbrow_t row = table->rows[i];
-		afprintf(fout, "%zu\n%zd\n%f\n%s\n%d\n%s\n", ROW_FMT(row));
+		afprintf(fout, fmt, ROW_ARG(row));
 	}
 	return 1;
 }
@@ -330,30 +319,46 @@ int load_table(FILE *fin, FILE *ferr, table_t **out_table, char *line) {
 	return 1;
 }
 
+void print_menu(FILE *fout) {
+	afprintf(fout,
+		"STANKIN static database operator\n"
+		"\tCommand\tAlias\tDescription\n"
+		"\thelp\t\tPrint this message\n"
+		"\tquit\texit\tExit\n"
+		"\tfill\t\tFill table with data\n"
+		"\tadd\t\tAppend row to table\n"
+		"\tprint\t\tPrint table\n"
+		"\tsave\texport\tSave table to file\n"
+		"\tload\timport\tLoad table from file\n"
+		"========\n"
+	);
+}
+
 int main(void) {
+	// prompt display ("> ")
+	// filter
+	// delete
 	FILE *fin = stdin;	 // no free
 	FILE *fout = stdout; // no free
 	FILE *ferr = stderr; // no free
 	table_t *table = NULL;
 	char line[MAX_LINE_SIZE] = {0};
+	print_menu(fout);
 	while (1) {
+		afprintf(fout, "> ");
 		if (fgets(line, MAX_LINE_SIZE, fin) == NULL) {
+			// don't think it's actually possible with stack-allocated `line`
 			afprintf(ferr, "Get line error (fgets returned NULL)\n");
 			break;
 		}
-		if (ferror(fin)) {
-			afprintf(ferr, "Everything is bad\n");
-			break;
-		}
-		else if (feof(fin)) {
-			afprintf(ferr, "EOF\n");
-			break;
-		}
-		else if (strlen(line) == 5 && !strncmp("quit\n", line, 5)) {
+		else if (ferror(fin)) { afprintf(ferr, "Everything is bad\n"); break; }
+		else if (feof(fin)) { afprintf(ferr, "EOF\n"); break; }
+		else if (PROMPT("q") || PROMPT("quit") || PROMPT("exit")) {
 			afprintf(fout, "Quitting\n");
 			break;
 		}
-		else if (strlen(line) == 5 && !strncmp("fill\n", line, 5)) {
+		else if (PROMPT("h") || PROMPT("help")) { print_menu(fout); }
+		else if (PROMPT("f") || PROMPT("fill")) {
 			size_t nrows = 0;
 			do {
 				afprintf(fout, "Row count: ");
@@ -371,26 +376,14 @@ int main(void) {
 				}
 			}
 		}
-		else if (strlen(line) == 2 && !strncmp("i\n", line, 2)) {
-			int64_t testi;
-			afprintf(fout, "Int: ");
-			fgets(line, MAX_LINE_SIZE, fin);
-			if (parse_int(line, &testi)) afprintf(fout, "%zd\n", testi);
+		else if (PROMPT("p") || PROMPT("print")) {
+			print_table(fout, ferr, table, 0);
 		}
-		else if (strlen(line) == 2 && !strncmp("f\n", line, 2)) {
-			double testf;
-			afprintf(fout, "Float: ");
-			fgets(line, MAX_LINE_SIZE, fin);
-			if (parse_float(line, &testf)) afprintf(fout, "%f\n", testf);
-		}
-		else if (strlen(line) == 6 && !strncmp("print\n", line, 6)) {
-			print_table(fout, ferr, table);
-		}
-		else if (strlen(line) == 4 && !strncmp("add\n", line, 4)) {
+		else if (PROMPT("a") || PROMPT("add")) {
 			if (table == NULL) table = table_new(16);
 			if (!add_row(fin, fout, ferr, table, line, 1)) { afprintf(fout, "Cancelled\n"); }
 		}
-		else if (strlen(line) == 5 && !strncmp("save\n", line, 5)) {
+		else if (PROMPT("s") || PROMPT("save") || PROMPT("export")) {
 			FILE *fsave = NULL;
 			do {
 				afprintf(fout, "Path: ");
@@ -408,12 +401,12 @@ int main(void) {
 			}
 			while (1);
 			afprintf(fout, "Saving current table to '%s'\n", line);
-			dump_table(fsave, ferr, table);
+			print_table(fsave, ferr, table, 1);
 			afprintf(fout, "Saved current table\n");
 			if (fsave != NULL) fclose(fsave);
-save_cancel:;
+		save_cancel:;
 		}
-		else if (strlen(line) == 5 && !strncmp("load\n", line, 5)) {
+		else if (PROMPT("l") || PROMPT("load") || PROMPT("import")) {
 			FILE *fload = NULL;
 			do {
 				afprintf(fout, "Path: ");
@@ -434,10 +427,19 @@ save_cancel:;
 			load_table(fload, ferr, &table, line);
 			afprintf(fout, "Loaded current table\n");
 			if (fload != NULL) fclose(fload);
-load_cancel:;
+		load_cancel:;
 		}
-		else {
-			afprintf(fout, "%s", line); // contains \n
+		else if (PROMPT("i")) {
+			int64_t testi;
+			afprintf(fout, "Int: ");
+			fgets(line, MAX_LINE_SIZE, fin);
+			if (parse_int(line, &testi)) afprintf(fout, "%zd\n", testi);
+		}
+		else if (PROMPT("f")) {
+			double testf;
+			afprintf(fout, "Float: ");
+			fgets(line, MAX_LINE_SIZE, fin);
+			if (parse_float(line, &testf)) afprintf(fout, "%f\n", testf);
 		}
 	}
 	if (table != NULL) table_free(table);
