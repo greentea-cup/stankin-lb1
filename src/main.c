@@ -155,6 +155,58 @@ int table_append(table_t *table, dbrow_t row) {
 	return 1;
 }
 
+typedef struct {
+	enum {TC_ID, TC_C1, TC_C2, TC_C3, TC_C4, TC_C5} column;
+	enum {C_EQ, C_NEQ, C_LT, C_GT, C_LE, C_GE, C_BTW} condition;
+	union {
+		size_t uint_value;
+		int64_t int_value;
+		bool bool_value;
+		char *str_value;
+	} data1;
+	union {
+		size_t uint_value;
+		int64_t int_value;
+		bool bool_value;
+		char *str_value;
+	} data2;
+	size_t start_pos;
+} table_find_t;
+
+int table_find_first(table_t *table, table_find_t findspec, size_t *out_idx) {
+	if (table == NULL || table->rows == NULL || table->len == 0 || out_idx == NULL) return 0;
+	if (findspec.column == TC_ID && findspec.condition == C_EQ) {
+		// special case - id ASC unique
+		size_t id = findspec.data1.uint_value;
+		size_t start = findspec.start_pos, end = table->len - 1;
+		size_t end0 = end, result_idx = (size_t) -1;
+		while (result_idx == (size_t) -1 && start <= end && end <= end0) {
+			size_t middle = (start + end) / 2;
+			size_t middle_id = table->rows[middle].id;
+			if (middle_id < id) { start = middle + 1; }
+			else if (middle_id > id) { end = middle - 1; }
+			else { result_idx = middle; }
+		}
+		if (result_idx == (size_t) -1) { return 0; }
+		else {
+			*out_idx = result_idx;
+			return 1;
+		}
+	}
+	// if ((findspec.column == TC_C3 || findspec.column == TC_C5)
+	//	&& !(findspec.condition == C_EQ || )
+	return 0;
+}
+
+int table_remove_at(table_t *table, size_t pos) {
+	if (table == NULL || table->rows == NULL || table->len == 0 || pos >= table->len) return 0;
+	for (size_t i = pos; i < table->len - 1; i++) {
+		table->rows[i] = table->rows[i + 1];
+	}
+	table->len--;
+	return 1;
+}
+
 void table_free(table_t *table) {
 	free(table->rows);
 	free(table);
@@ -162,52 +214,55 @@ void table_free(table_t *table) {
 
 // get_*
 /*
- * manual = 1 if interactive input
+ * interactive = 1 if interactive input
  * returns 1 on success, 0 on failure
  */
-int get_uint(FILE *fin, FILE *fout, FILE *ferr, char *line, char const *prompt, char const *onerror, int manual, size_t *out_result) {
+int get_uint(FILE *fin, FILE *fout, FILE *ferr, char *line, char const *prompt, char const *onerror, int interactive, size_t *out_result) {
 	if (fin == NULL || out_result == NULL) return 0;
 	do {
 		if (prompt != NULL) afprintf(fout, "%s", prompt);
 		fgets(line, MAX_LINE_SIZE, fin);
 		if (parse_uint(line, out_result) == 0) {
-			if (manual) { if (onerror != NULL) afprintf(ferr, "%s", onerror); }
+			if (interactive) { if (onerror != NULL) afprintf(ferr, "%s", onerror); }
 			else { return 0; }
 		}
+		else { return 1; }
 	}
-	while (manual);
+	while (interactive);
 	return 1;
 }
 
-int get_int(FILE *fin, FILE *fout, FILE *ferr, char *line, char const *prompt, char const *onerror, int manual, int64_t *out_result) {
+int get_int(FILE *fin, FILE *fout, FILE *ferr, char *line, char const *prompt, char const *onerror, int interactive, int64_t *out_result) {
 	if (fin == NULL || out_result == NULL) return 0;
 	do {
 		if (prompt != NULL) afprintf(fout, "%s", prompt);
 		fgets(line, MAX_LINE_SIZE, fin);
 		if (parse_int(line, out_result) == 0) {
-			if (manual) { if (onerror != NULL) afprintf(ferr, "%s", onerror); }
+			if (interactive) { if (onerror != NULL) afprintf(ferr, "%s", onerror); }
 			else { return 0; }
 		}
+		else { return 1; }
 	}
-	while (manual);
+	while (interactive);
 	return 1;
 }
 
-int get_float(FILE *fin, FILE *fout, FILE *ferr, char *line, char const *prompt, char const *onerror, int manual, double *out_result) {
+int get_float(FILE *fin, FILE *fout, FILE *ferr, char *line, char const *prompt, char const *onerror, int interactive, double *out_result) {
 	if (fin == NULL || out_result == NULL) return 0;
 	do {
 		if (prompt != NULL) afprintf(fout, "%s", prompt);
 		fgets(line, MAX_LINE_SIZE, fin);
 		if (parse_float(line, out_result) == 0) {
-			if (manual) { if (onerror != NULL) afprintf(ferr, "%s", onerror); }
+			if (interactive) { if (onerror != NULL) afprintf(ferr, "%s", onerror); }
 			else { return 0; }
 		}
+		else { return 1; }
 	}
-	while (manual);
+	while (interactive);
 	return 1;
 }
 
-int get_bool(FILE *fin, FILE *fout, FILE *ferr, char *line, char const *prompt, char const *onerror, int manual, bool *out_result) {
+int get_bool(FILE *fin, FILE *fout, FILE *ferr, char *line, char const *prompt, char const *onerror, int interactive, bool *out_result) {
 	if (fin == NULL || out_result == NULL) return 0;
 	do {
 		if (prompt != NULL) afprintf(fout, "%s", prompt);
@@ -224,36 +279,36 @@ int get_bool(FILE *fin, FILE *fout, FILE *ferr, char *line, char const *prompt, 
 			*out_result = 1;
 			break;
 		}
-		else if (manual) {
+		else if (interactive) {
 			afprintf(ferr, "%s", onerror);
 		}
 		else { return 0; }
 
 	}
-	while (manual);
+	while (interactive);
 	return 1;
 }
 // end get_*
 
 /*
- * manual = 1 if interactive input
+ * interactive = 1 if interactive input
  * returns 1 on success, 0 on failure
  */
-int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int manual) {
+int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int interactive) {
 	size_t id;
-	if (manual) { id = table->next_id++; }
-	else if (get_uint(fin, fout, ferr, line, "id[uint]: ", "id: Uint expected\n", manual, &id) == 0) {
+	if (interactive) { id = table->next_id++; }
+	else if (get_uint(fin, fout, ferr, line, "id[uint]: ", "id: Uint expected\n", interactive, &id) == 0) {
 		goto bad_id;
 	}
-	dbrow_t row = {0};
+	dbrow_t row = {.id = id};
 
 	// int64_t c1;
 	if (get_int(
-			fin, fout, ferr, line, "c1[int]: ", "c1: Int expected\n", manual, &row.c1
+			fin, fout, ferr, line, "c1[int]: ", "c1: Int expected\n", interactive, &row.c1
 		) == 0) { goto bad_c1; }
 	// double c2; // todo: find some float64_t
 	if (get_float(
-			fin, fout, ferr, line, "c2[float]: ", "c2: Float expected\n", manual, &row.c2
+			fin, fout, ferr, line, "c2[float]: ", "c2: Float expected\n", interactive, &row.c2
 		) == 0) { goto bad_c2; }
 	// char c3[16+1]; a-zA-Z0-9
 	do {
@@ -276,18 +331,18 @@ int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int m
 			row.c3[end] = '\0'; // replace last char with \0
 			break;
 		}
-		else if (manual) {
+		else if (interactive) {
 			afprintf(ferr, "c3: Max length: 16; Valid chars are 0-9 a-z A-Z\n");
 		}
 		else { goto bad_c3; }
 	}
-	while (manual);
+	while (interactive);
 
 	// bool c4;
-    if (get_bool(
-        fin, fout, ferr, line, "c4[bool]: ", "c4: Valid options are: "
-        "<blank = 0> 0 1 T[RUE] F[ALSE] t[rue] f[alse] ON OFF on off\n", manual, &row.c4
-        ) == 0) { goto bad_c4; }
+	if (get_bool(
+			fin, fout, ferr, line, "c4[bool]: ", "c4: Valid options are: "
+			"<blank = 0> 0 1 T[RUE] F[ALSE] t[rue] f[alse] ON OFF on off\n", interactive, &row.c4
+		) == 0) { goto bad_c4; }
 	// char c5[32+1];
 	do {
 		afprintf(fout, "c5[char 32]: ");
@@ -310,12 +365,12 @@ int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int m
 			row.c5[end] = '\0';
 			break;
 		}
-		else if (manual) {
+		else if (interactive) {
 			afprintf(ferr, "c5: Max length: 31; Valid chars are 0-9 a-z A-Z \\s\n");
 		}
 		else { goto bad_c5; }
 	}
-	while (manual);
+	while (interactive);
 	table_append(table, row);
 	return 1;
 bad_c5:
@@ -323,6 +378,31 @@ bad_c4:
 bad_c3:
 bad_c2:
 bad_c1:
+bad_id:
+	return 0;
+}
+
+int delete_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line) {
+	if (table == NULL || table->rows == NULL) {
+		afprintf(ferr, "No table\n");
+		return 0;
+	}
+	size_t id;
+	if (get_uint(fin, fout, ferr, line, "Row id: ", "id: Uint expected\n", 1, &id) == 0) { goto bad_id; }
+	table_find_t findspec = {
+		.condition = C_EQ,
+		.column = TC_ID,
+		.data1.uint_value = id,
+		.data2.uint_value = 0
+	};
+	size_t rowpos;
+	if (table_find_first(table, findspec, &rowpos) == 0) {
+		afprintf(ferr, "Row with id %zu not found\n", id);
+		return 0;
+	}
+	afprintf(fout, "Row with id %zu is at position %zu\n", id, rowpos);
+	table_remove_at(table, rowpos);
+	return 1;
 bad_id:
 	return 0;
 }
@@ -346,6 +426,10 @@ int print_table(FILE *fout, FILE *ferr, table_t *table, int dump) {
 		afprintf(fout, fmt, ROW_ARG(row));
 	}
 	return 1;
+}
+
+int filter_rows(void) {
+	return 0;
 }
 
 int load_table(FILE *fin, FILE *ferr, table_t **out_table, char *line) {
@@ -404,17 +488,20 @@ int main(void) {
 		else if (PROMPT("f") || PROMPT("fill")) {
 			size_t nrows = 0;
 			do {
-				afprintf(fout, "Row count: ");
-				fgets(line, MAX_LINE_SIZE, fin);
-				if (parse_uint(line, &nrows) && nrows != 0) break;
+				if (get_uint(
+						fin, fout, ferr, line, "Row count: ",
+						"Row count: Uint > 0 expected\n", 1, &nrows
+					) && nrows == 0) {
+					afprintf(ferr, "Row count should be > 0\n");
+				}
 			}
-			while (1);
+			while (nrows == 0);
 			if (table != NULL) table_free(table);
 			table = table_new(nrows);
 			afprintf(fout, "%zu rows\n", nrows);
 			for (size_t i = 0; i < nrows; i++) {
 				afprintf(fout, "[%zu]:\n", i);
-				if (!add_row(fin, fout, ferr, table, line, 1)) {
+				if (add_row(fin, fout, ferr, table, line, 1) == 0) {
 					afprintf(fout, "Early exit; unimplemented");
 				}
 			}
@@ -424,7 +511,10 @@ int main(void) {
 		}
 		else if (PROMPT("a") || PROMPT("add")) {
 			if (table == NULL) table = table_new(16);
-			if (!add_row(fin, fout, ferr, table, line, 1)) { afprintf(fout, "Cancelled\n"); }
+			if (add_row(fin, fout, ferr, table, line, 1) == 0) { afprintf(fout, "Cancelled\n"); }
+		}
+		else if (PROMPT("d") || PROMPT("delete")) {
+			delete_row(fin, fout, ferr, table, line);
 		}
 		else if (PROMPT("s") || PROMPT("save") || PROMPT("export")) {
 			FILE *fsave = NULL;
@@ -472,13 +562,13 @@ int main(void) {
 			if (fload != NULL) fclose(fload);
 		load_cancel:;
 		}
-		else if (PROMPT("i")) {
+		else if (PROMPT("t_i")) {
 			int64_t testi;
 			afprintf(fout, "Int: ");
 			fgets(line, MAX_LINE_SIZE, fin);
 			if (parse_int(line, &testi)) afprintf(fout, "%zd\n", testi);
 		}
-		else if (PROMPT("f")) {
+		else if (PROMPT("t_f")) {
 			double testf;
 			afprintf(fout, "Float: ");
 			fgets(line, MAX_LINE_SIZE, fin);
