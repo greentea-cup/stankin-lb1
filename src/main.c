@@ -296,7 +296,7 @@ int get_bool(FILE *fin, FILE *fout, FILE *ferr, char *line, char const *prompt, 
  */
 int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int interactive) {
 	size_t id;
-	if (interactive) { id = table->next_id++; }
+	if (interactive) { id = table->next_id; }
 	else if (get_uint(fin, fout, ferr, line, "id[uint]: ", "id: Uint expected\n", interactive, &id) == 0) {
 		goto bad_id;
 	}
@@ -372,6 +372,7 @@ int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int i
 	}
 	while (interactive);
 	table_append(table, row);
+	if (interactive) { table->next_id++; }
 	return 1;
 bad_c5:
 bad_c4:
