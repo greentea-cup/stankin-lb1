@@ -110,16 +110,16 @@ int load_table(FILE *fin, FILE *ferr, table_t **out_table, char *line) {
 int print_menu(FILE *fout) {
 	afprintf(fout,
 		"STANKIN static database operator\n"
-		"\tCommand\tAlias\tDescription\n"
-		"\thelp\t\tPrint this message\n"
-		"\tquit\texit\tExit\n"
-		"\tfill\t\tFill table with data\n"
-		"\tadd\t\tAppend row to table\n"
-		"\twhere\tsearch\tSearch for specific values\n"
-		"\torder\tsort\tSort rows by criterion\n"
-		"\tprint\t\tPrint table\n"
-		"\tsave\texport\tSave table to file\n"
-		"\tload\timport\tLoad table from file\n"
+		"        Command\tAlias\tDescription\n"
+		"        help\t\tPrint this message\n"
+		"        quit\texit\tExit\n"
+		"        fill\t\tFill table with data\n"
+		"        add\t\tAppend row to table\n"
+		"        where\tsearch\tSearch for specific values\n"
+		"        order\tsort\tSort rows by criterion\n"
+		"        print\t\tPrint table\n"
+		"        save\texport\tSave table to file\n"
+		"        load\timport\tLoad table from file\n"
 		"========\n"
 	);
 	return 1;
