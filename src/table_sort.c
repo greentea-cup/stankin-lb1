@@ -36,13 +36,10 @@ STR_Q(c5, 33)
  */
 int table_sort(table_t const *table, table_sort_t sortspec, dbrow_t **out_result) {
 	if (table == NULL || table->rows == NULL || table->len == 0 || out_result == NULL) return 0;
-	size_t len = table->len;
-	dbrow_t *rows = malloc(sizeof(dbrow_t) * len);
-	if (rows == NULL) return 0;
-	memcpy(rows, table->rows, sizeof(dbrow_t) * len);
 	int desc = sortspec.direction == S_DESC;
-	cmp_func cmp;
+	cmp_func cmp = NULL;
 	switch (sortspec.column) {
+	default: return 0;
 	case TC_ID: cmp = desc ? cmp_id_desc : cmp_id_asc; break;
 	case TC_C1: cmp = desc ? cmp_c1_desc : cmp_c1_asc; break;
 	case TC_C2: cmp = desc ? cmp_c2_desc : cmp_c2_asc; break;
@@ -50,6 +47,10 @@ int table_sort(table_t const *table, table_sort_t sortspec, dbrow_t **out_result
 	case TC_C4: cmp = desc ? cmp_c4_desc : cmp_c4_asc; break;
 	case TC_C5: cmp = desc ? cmp_c5_desc : cmp_c5_asc; break;
 	}
+	size_t len = table->len;
+	dbrow_t *rows = malloc(sizeof(dbrow_t) * len);
+	if (rows == NULL) return 0;
+	memcpy(rows, table->rows, sizeof(dbrow_t) * len);
 	qsort(rows, len, sizeof(dbrow_t), cmp);
 	*out_result = rows;
 	return 1;

@@ -92,7 +92,7 @@ int print_matching_rows(FILE *fout, FILE *ferr, table_t const *table, table_find
 }
 
 int load_table(FILE *fin, FILE *ferr, table_t **out_table, char *line) {
-	// no error checking
+	if (out_table == NULL) return 0;
 	size_t table_len = 0, table_next_id = 0;
 	fgets(line, MAX_LINE_SIZE, fin);
 	parse_uint(line, &table_len);
@@ -126,6 +126,7 @@ int print_menu(FILE *fout) {
 }
 
 void fill_table(FILE *fin, FILE *fout, FILE *ferr, char *line, int retries, table_t **table) {
+	if (table == NULL) return;
 	size_t nrows = 0;
 	if (get_uint(fin, fout, ferr, line, "Row count: ",
 			"Row count: Uint > 0 expected\n", retries, &nrows) && nrows == 0) {
@@ -152,14 +153,12 @@ void filter_table(FILE *fin, FILE *fout, FILE *ferr, table_t const *table, char 
 	size_t colnum;
 	get_uint(fin, fout, ferr, line,
 		"Column num[uint 0-5, other for exit]: ", "Uint expected", retries, &colnum);
-	switch (colnum) {
-	default: afprintf(fout, "Cancelled\n"); return;
-	case 0: findspec.column = TC_ID; break;
-	case 1: findspec.column = TC_C1; break;
-	case 2: findspec.column = TC_C2; break;
-	case 3: findspec.column = TC_C3; break;
-	case 4: findspec.column = TC_C4; break;
-	case 5: findspec.column = TC_C5; break;
+	if (colnum > TC_C5) {
+		afprintf(fout, "Cancelled\n");
+		return;
+	}
+	else {
+		findspec.column = TC_ID + colnum;
 	}
 	int rt = retries;
 	switch (findspec.column) {
@@ -197,32 +196,24 @@ void filter_table(FILE *fin, FILE *fout, FILE *ferr, table_t const *table, char 
 		if (rt == 0) { afprintf(ferr, "Max retries exceeded\n"); return; }
 		break;
 	}
+#define FT_GET_(enumv, col, type, amp) case enumv: \
+		get_##col(fin, fout, ferr, line, #col ": first operand[" #type "]: ", NULL, retries, amp findspec.data1.col);
+#define FT_GET1(...) FT_GET_(__VA_ARGS__); break;
+#define FT_GET2(enumv, col, type, amp) FT_GET_(enumv, col, type, amp); \
+	if (findspec.condition == C_BTW) \
+		get_##col(fin, fout, ferr, line, #col ": second operand[" #type "]: ", NULL, retries, amp findspec.data2.col); \
+	break;
 	switch (findspec.column) {
-	case TC_ID:
-		get_id(fin, fout, ferr, line, "id: first operand[uint]: ", NULL, retries, &findspec.data1.id);
-		if (findspec.condition == C_BTW)
-			get_id(fin, fout, ferr, line, "id: second operand[uint]", NULL, retries, &findspec.data2.id);
-		break;
-	case TC_C1:
-		get_c1(fin, fout, ferr, line, "c1: first operand[int]: ", NULL, retries, &findspec.data1.c1);
-		if (findspec.condition == C_BTW)
-			get_c1(fin, fout, ferr, line, "c1: second operand[int]: ", NULL, retries, &findspec.data2.c1);
-		break;
-	case TC_C2:
-		get_c2(fin, fout, ferr, line, "c2: first operand[float]: ", NULL, retries, &findspec.data1.c2);
-		if (findspec.condition == C_BTW)
-			get_c2(fin, fout, ferr, line, "c2: second operand[float]: ", NULL, retries, &findspec.data2.c2);
-		break;
-	case TC_C3:
-		get_c3(fin, fout, ferr, line, "c3: first operand[char 16]: ", NULL, retries, findspec.data1.c3);
-		break;
-	case TC_C4:
-		get_c4(fin, fout, ferr, line, "c4: first operand[bool]: ", NULL, retries, &findspec.data1.c4);
-		break;
-	case TC_C5:
-		get_c5(fin, fout, ferr, line, "c5: first operand[char 32]: ", NULL, retries, findspec.data1.c5);
-		break;
+		FT_GET2(TC_ID, id, uint, &);
+		FT_GET2(TC_C1, c1, uint, &);
+		FT_GET2(TC_C2, c2, uint, &);
+		FT_GET1(TC_C3, c3, uint,);
+		FT_GET1(TC_C4, c4, uint, &);
+		FT_GET1(TC_C5, c5, uint,);
 	}
+#undef FT_GET_
+#undef FT_GET1
+#undef FT_GET2
 	print_matching_rows(fout, ferr, table, findspec);
 }
 
@@ -320,6 +311,7 @@ int main(int argc, char *argv[]) {
 		afprintf(fout, "> ");
 		if (fgets(line, MAX_LINE_SIZE, fin) == NULL) {
 			// don't think it's actually possible with stack-allocated `line`
+			// edit: possible when redirecting stdin
 			afprintf(ferr, "Get line error (fgets returned NULL)\n");
 			break;
 		}
