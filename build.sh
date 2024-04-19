@@ -1,6 +1,6 @@
 #!/bin/sh
 
-BUILD_TYPE="${BUILD_TYPE:-${1:-Release}}"
+BUILD_TYPE="${BUILD_TYPE:-Release}"
 echo "Using BUILD_TYPE=$BUILD_TYPE"
 
 ./fmt.sh
