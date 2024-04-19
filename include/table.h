@@ -14,7 +14,7 @@ typedef struct {
 	char c5[33];
 } dbrow_t;
 
-#define ROW_ARG(row) row.id, row.c1, row.c2, row.c3, row.c4, row.c5
+#define ROW_ARG(row) row.id, row.c1, row.c2, row.c3, row.c4 ? "TRUE" : "FALSE", row.c5
 
 typedef union {
 	size_t id;

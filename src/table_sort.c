@@ -51,5 +51,6 @@ int table_sort(table_t const *table, table_sort_t sortspec, dbrow_t **out_result
 	case TC_C5: cmp = desc ? cmp_c5_desc : cmp_c5_asc; break;
 	}
 	qsort(rows, len, sizeof(dbrow_t), cmp);
+	*out_result = rows;
 	return 1;
 }

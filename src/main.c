@@ -52,7 +52,7 @@ int delete_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, in
 	return 1;
 }
 
-#define ROW_HUMAN_FORMAT "%zu\t%zd\t%f\t'%s'\t%d\t'%s'\n"
+#define ROW_HUMAN_FORMAT "%zu\t%zd\t%f\t'%s'\t%s\t'%s'\n"
 #define ROW_DUMP_FORMAT "%zu\n%zd\n%f\n%s\n%d\n%s\n"
 #define ROW_HEADER "id\tc1\tc2\tc3\tc4\tc5\n"
 
@@ -116,7 +116,7 @@ int print_menu(FILE *fout) {
 		"\tfill\t\tFill table with data\n"
 		"\tadd\t\tAppend row to table\n"
 		"\twhere\tsearch\tSearch for specific values\n"
-		"\to\torder\tsort\tSort rows by criterion\n"
+		"\torder\tsort\tSort rows by criterion\n"
 		"\tprint\t\tPrint table\n"
 		"\tsave\texport\tSave table to file\n"
 		"\tload\timport\tLoad table from file\n"
@@ -149,24 +149,19 @@ void fill_table(FILE *fin, FILE *fout, FILE *ferr, char *line, int retries, tabl
 void filter_table(FILE *fin, FILE *fout, FILE *ferr, table_t const *table, char *line,
 	int retries) {
 	table_find_t findspec = {0};
-	int rt = retries;
-	do {
-		size_t colnum;
-		get_uint(fin, fout, ferr, line,
-			"Column num[uint 0-5, other for exit]: ", "Uint expected", retries, &colnum);
-		switch (colnum) {
-		default: afprintf(fout, "Cancelled\n"); return;
-		case 0: findspec.column = TC_ID; break;
-		case 1: findspec.column = TC_C1; break;
-		case 2: findspec.column = TC_C2; break;
-		case 3: findspec.column = TC_C3; break;
-		case 4: findspec.column = TC_C4; break;
-		case 5: findspec.column = TC_C5; break;
-		}
-		break;
+	size_t colnum;
+	get_uint(fin, fout, ferr, line,
+		"Column num[uint 0-5, other for exit]: ", "Uint expected", retries, &colnum);
+	switch (colnum) {
+	default: afprintf(fout, "Cancelled\n"); return;
+	case 0: findspec.column = TC_ID; break;
+	case 1: findspec.column = TC_C1; break;
+	case 2: findspec.column = TC_C2; break;
+	case 3: findspec.column = TC_C3; break;
+	case 4: findspec.column = TC_C4; break;
+	case 5: findspec.column = TC_C5; break;
 	}
-	while (rt--);
-	rt = retries;
+	int rt = retries;
 	switch (findspec.column) {
 	case TC_ID:
 	case TC_C1:
@@ -185,6 +180,7 @@ void filter_table(FILE *fin, FILE *fout, FILE *ferr, table_t const *table, char 
 			else { afprintf(ferr, "Compare: = ! > >= < <= <> expected\n"); }
 		}
 		while (rt--);
+		if (rt == 0) { afprintf(ferr, "Max retries exceeded\n"); return; }
 		break;
 	case TC_C3:
 	case TC_C4:
@@ -198,6 +194,7 @@ void filter_table(FILE *fin, FILE *fout, FILE *ferr, table_t const *table, char 
 			else { afprintf(ferr, "Compare: = ! expected\n"); }
 		}
 		while (rt--);
+		if (rt == 0) { afprintf(ferr, "Max retries exceeded\n"); return; }
 		break;
 	}
 	switch (findspec.column) {
@@ -231,6 +228,37 @@ void filter_table(FILE *fin, FILE *fout, FILE *ferr, table_t const *table, char 
 
 void sort_table(FILE *fin, FILE *fout, FILE *ferr, table_t const *table, char *line,
 	int retries) {
+	table_sort_t sortspec = {0};
+	size_t colnum;
+	get_uint(fin, fout, ferr, line,
+		"Column num[uint 0-5, other for exit]: ", "Uint expected", retries, &colnum);
+	switch (colnum) {
+	default: afprintf(fout, "Cancelled\n"); return;
+	case 0: sortspec.column = TC_ID; break;
+	case 1: sortspec.column = TC_C1; break;
+	case 2: sortspec.column = TC_C2; break;
+	case 3: sortspec.column = TC_C3; break;
+	case 4: sortspec.column = TC_C4; break;
+	case 5: sortspec.column = TC_C5; break;
+	}
+	int rt = retries;
+	do {
+		afprintf(fout, "Order[asc + desc -]: ");
+		fgets(line, MAX_LINE_SIZE, fin);
+		if (line[0] == '\n') { afprintf(fout, "Cancelled\n"); return; }
+		else if (PROMPT("asc") || PROMPT("ASC") || PROMPT("+")) { sortspec.direction = S_ASC; break; }
+		else if (PROMPT("desc") || PROMPT("DESC") || PROMPT("-")) { sortspec.direction = S_DESC; break; }
+		else { afprintf(ferr, "Order: asc + desc - expected\n"); }
+	}
+	while (rt--);
+	if (rt == 0) { afprintf(ferr, "Max retries exceeded\n"); return; }
+	dbrow_t *sorted;
+	table_sort(table, sortspec, &sorted);
+	afprintf(fout, ROW_HEADER);
+	for (size_t i = 0, len = table->len; i < len; i++) {
+		afprintf(fout, ROW_HUMAN_FORMAT, ROW_ARG(sorted[i]));
+	}
+	free(sorted);
 }
 
 void export_table(FILE *fin, FILE *fout, FILE *ferr, table_t const *table, char *line,
@@ -239,20 +267,16 @@ void export_table(FILE *fin, FILE *fout, FILE *ferr, table_t const *table, char 
 	do {
 		afprintf(fout, "Path: ");
 		fgets(line, MAX_LINE_SIZE, fin);
-		if (strlen(line) == 1) {
-			afprintf(fout, "Cancelled\n");
-			return;
-		}
+		if (strlen(line) == 1) { afprintf(fout, "Cancelled\n"); return; }
 		size_t i = 0;
 		while (line[i] != '\n' && line[i] != '\0' && i < MAX_LINE_SIZE) i++;
 		line[i] = '\0';
 		fsave = fopen(line, "w");
-		if (fsave == NULL) {
-			afprintf(fout, "Cannot open file '%s'\n", line);
-		}
+		if (fsave == NULL) { afprintf(fout, "Cannot open file '%s'\n", line); }
 		else break;
 	}
 	while (retries--);
+	if (retries == 0) { afprintf(ferr, "Max retries exceeded\n"); return; }
 	afprintf(fout, "Saving current table to '%s'\n", line);
 	print_table(fsave, ferr, table, 1);
 	afprintf(fout, "Saved current table\n");
@@ -276,20 +300,21 @@ void import_table(FILE *fin, FILE *fout, FILE *ferr, table_t **table, char *line
 		else { break; }
 	}
 	while (retries--);
+	if (retries == 0) { afprintf(ferr, "Max retries exceeded\n"); return; }
 	afprintf(fout, "Loading table from '%s'\n", line);
 	load_table(fload, ferr, table, line);
 	afprintf(fout, "Loaded table\n");
 	if (fload != NULL) fclose(fload);
 }
 
-int main(void) {
+int main(int argc, char *argv[]) {
 	// sort by column (ASC / DESC)
 	FILE *fin = stdin; // no free
 	FILE *fout = stdout; // no free
 	FILE *ferr = stderr; // no free
 	table_t *table = NULL;
 	char line[MAX_LINE_SIZE] = {0};
-	print_menu(fout);
+	if (!(argc > 1 && strcmp(argv[1], "--no-menu") == 0)) print_menu(fout);
 	int retries = 3;
 	while (1) {
 		afprintf(fout, "> ");
@@ -304,6 +329,7 @@ int main(void) {
 		else if (feof(fin)) {
 			afprintf(ferr, "EOF\n"); break;
 		}
+		else if (line[0] == '\n') {continue;}
 		else if (PROMPT("q") || PROMPT("quit") || PROMPT("exit")) {
 			afprintf(fout, "Quitting\n"); break;
 		}
@@ -351,6 +377,10 @@ int main(void) {
 			for (unsigned int i = 0; i < 100; i++) {
 				afprintf(fout, "\n");
 			}
+		}
+		else if (PROMPT("t_q")) {
+			// silent quit
+			break;
 		}
 		else {
 			afprintf(fout, "Unknown command: %s", line);
