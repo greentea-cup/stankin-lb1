@@ -5,9 +5,9 @@
 #define MAX_LINE_SIZE 1024
 #endif
 
-// Note: both gcc and clang optimize away strlen calls on static string literals
-// msvc does it only with /O2, so x64-debug may be a bit unoptimized
-#define PROMPT(x) (strlen(line) == strlen(x "\n") && !strncmp(x "\n", line, strlen(x "\n")))
+// Note: msvc needs /Oi flag (request to generate intrinsics)
+// for this to inline strlen calls on string literals
+#define PROMPT(x) (strlen(line) == (strlen(x) + 1) && !strncmp(x, line, strlen(x)) && line[strlen(x)] == '\n')
 #define afprintf(stream, ...) { if (stream != NULL) fprintf(stream, __VA_ARGS__); }
 
 #endif
