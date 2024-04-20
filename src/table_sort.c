@@ -7,13 +7,14 @@
 typedef int (*cmp_func)(void const *, void const *);
 
 #define CMP(field, type, mul) static int \
-	cmp_##field##_##type(void const *a, void const *b) { \
-		int x = (mul) * ( ( (dbrow_t*)a )->field - ( (dbrow_t*)b )->field ); \
-		return (x > 0) - (x < 0); \
+	cmp_##field##_##type(void const *a0, void const *b0) { \
+		dbrow_t const *a = (dbrow_t const *)a0; \
+		dbrow_t const *b = (dbrow_t const *)b0; \
+		return (mul) * ( ((a->field - b->field) > 0) - ((a->field - b->field) < 0) ); \
 	}
 #define STR_CMP(field, type, mul, maxlen) static int cmp_##field##_##type(void const *a, void const *b) { \
-		char const *str1 = ( (dbrow_t*)a )->field; \
-		char const *str2 = ( (dbrow_t*)b )->field; \
+		char const *str1 = ( (dbrow_t const *)a )->field; \
+		char const *str2 = ( (dbrow_t const *)b )->field; \
 		return (mul) * strncmp(str1, str2, maxlen); \
 	}
 #define ASC(field) CMP(field, asc, +1)
