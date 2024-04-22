@@ -2,17 +2,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "table.h"
-#include "parse.h"
-#include "get.h"
 #include "defs.h"
+#include "get.h"
+#include "table.h"
 
 /*
  * returns 1 on success, 0 on failure
  * retries `interactive` times with each field
  * gets id automatically if interactive
  */
-int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int interactive) {
+int add_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, line_t *line, int interactive) {
+	// realize it will be broken with new string get_arg logic
 	size_t id;
 	if (interactive) { id = table->next_id; }
 	else if (get_id(fin, fout, ferr, line, NULL, NULL, interactive, &id) == 0) { goto add_cancel; }
@@ -30,7 +30,7 @@ add_cancel:
 	return 0;
 }
 
-int delete_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, int interactive) {
+int delete_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, line_t *line, int interactive) {
 	if (table == NULL || table->rows == NULL) {
 		afprintf(ferr, "No table\n");
 		return 0;
@@ -91,13 +91,13 @@ int print_matching_rows(FILE *fout, FILE *ferr, table_t const *table, table_find
 	return 1;
 }
 
-int load_table(FILE *fin, FILE *ferr, table_t **out_table, char *line) {
+int load_table(FILE *fin, FILE *ferr, table_t **out_table, line_t *line) {
 	if (out_table == NULL) return 0;
 	size_t table_len = 0, table_next_id = 0;
-	fgets(line, MAX_LINE_SIZE, fin);
-	parse_uint(line, &table_len);
-	fgets(line, MAX_LINE_SIZE, fin);
-	parse_uint(line, &table_next_id);
+	get_arg(fin, line);
+	lparse_uint(line, &table_len);
+	get_arg(fin, line);
+	lparse_uint(line, &table_next_id);
 	table_t *table = table_new(table_len);
 	table->next_id = table_next_id;
 	for (size_t i = 0; i < table_len; i++) {
@@ -125,7 +125,7 @@ int print_menu(FILE *fout) {
 	return 1;
 }
 
-void fill_table(FILE *fin, FILE *fout, FILE *ferr, char *line, int retries, table_t **table) {
+void fill_table(FILE *fin, FILE *fout, FILE *ferr, line_t *line, int retries, table_t **table) {
 	if (table == NULL) return;
 	size_t nrows = 0;
 	if (get_uint(fin, fout, ferr, line, "Row count: ",
@@ -147,7 +147,7 @@ void fill_table(FILE *fin, FILE *fout, FILE *ferr, char *line, int retries, tabl
 	*table = newtable;
 }
 
-void filter_table(FILE *fin, FILE *fout, FILE *ferr, table_t const *table, char *line,
+void filter_table(FILE *fin, FILE *fout, FILE *ferr, table_t const *table, line_t *line,
 	int retries) {
 	table_find_t findspec = {0};
 	size_t colnum;
@@ -168,7 +168,7 @@ void filter_table(FILE *fin, FILE *fout, FILE *ferr, table_t const *table, char 
 		// any of eq, neq, gt, ge, lt, le, btw
 		do {
 			afprintf(fout, "Compare method[= ! > >= < <= <>] [default =]: ");
-			fgets(line, MAX_LINE_SIZE, fin);
+			get_arg(fin, line);
 			if (PROMPT("") || PROMPT("=") || PROMPT("eq")) { findspec.condition = C_EQ; break; }
 			else if (PROMPT("!") || PROMPT("neq")) { findspec.condition = C_NEQ; break; }
 			else if (PROMPT(">") || PROMPT("gt")) { findspec.condition = C_GT; break; }
@@ -187,7 +187,7 @@ void filter_table(FILE *fin, FILE *fout, FILE *ferr, table_t const *table, char 
 		// any of eq, neq
 		do {
 			afprintf(fout, "Compare method: [= !] [default =]: ");
-			fgets(line, MAX_LINE_SIZE, fin);
+			get_arg(fin, line);
 			if (PROMPT("") || PROMPT("=") || PROMPT("eq")) { findspec.condition = C_EQ; break; }
 			else if (PROMPT("!") || PROMPT("neq")) { findspec.condition = C_NEQ; break; }
 			else { afprintf(ferr, "Compare: = ! expected\n"); }
@@ -217,7 +217,7 @@ void filter_table(FILE *fin, FILE *fout, FILE *ferr, table_t const *table, char 
 	print_matching_rows(fout, ferr, table, findspec);
 }
 
-void sort_table(FILE *fin, FILE *fout, FILE *ferr, table_t const *table, char *line,
+void sort_table(FILE *fin, FILE *fout, FILE *ferr, table_t const *table, line_t *line,
 	int retries) {
 	table_sort_t sortspec = {0};
 	size_t colnum;
@@ -235,8 +235,8 @@ void sort_table(FILE *fin, FILE *fout, FILE *ferr, table_t const *table, char *l
 	int rt = retries;
 	do {
 		afprintf(fout, "Order[asc + desc -]: ");
-		fgets(line, MAX_LINE_SIZE, fin);
-		if (line[0] == '\n') { afprintf(fout, "Cancelled\n"); return; }
+		get_arg(fin, line);
+		if (ARG_LEN == 0) { afprintf(fout, "Cancelled\n"); return; }
 		else if (PROMPT("asc") || PROMPT("ASC") || PROMPT("+")) { sortspec.direction = S_ASC; break; }
 		else if (PROMPT("desc") || PROMPT("DESC") || PROMPT("-")) { sortspec.direction = S_DESC; break; }
 		else { afprintf(ferr, "Order: asc + desc - expected\n"); }
@@ -252,47 +252,41 @@ void sort_table(FILE *fin, FILE *fout, FILE *ferr, table_t const *table, char *l
 	free(sorted);
 }
 
-void export_table(FILE *fin, FILE *fout, FILE *ferr, table_t const *table, char *line,
+void export_table(FILE *fin, FILE *fout, FILE *ferr, table_t const *table, line_t *line,
 	int retries) {
 	FILE *fsave = NULL;
 	do {
 		afprintf(fout, "Path: ");
-		fgets(line, MAX_LINE_SIZE, fin);
-		if (strlen(line) == 1) { afprintf(fout, "Cancelled\n"); return; }
-		size_t i = 0;
-		while (line[i] != '\n' && line[i] != '\0' && i < MAX_LINE_SIZE) i++;
-		line[i] = '\0';
-		fsave = fopen(line, "w");
-		if (fsave == NULL) { afprintf(fout, "Cannot open file '%s'\n", line); }
+		get_line(fin, line);
+		if (ARG_LEN == 0) { afprintf(fout, "Cancelled\n"); return; }
+		fsave = fopen(line->str, "w");
+		if (fsave == NULL) { afprintf(fout, "Cannot open file '"LINE_FMT"'\n", LINE_PARG(line)); }
 		else break;
 	}
 	while (retries--);
 	if (retries == 0) { afprintf(ferr, "Max retries exceeded\n"); return; }
-	afprintf(fout, "Saving current table to '%s'\n", line);
+	afprintf(fout, "Saving current table to '"LINE_FMT"'\n", LINE_PARG(line));
 	print_table(fsave, ferr, table, 1);
 	afprintf(fout, "Saved current table\n");
 	if (fsave != NULL) fclose(fsave);
 }
 
-void import_table(FILE *fin, FILE *fout, FILE *ferr, table_t **table, char *line, int retries) {
+void import_table(FILE *fin, FILE *fout, FILE *ferr, table_t **table, line_t *line, int retries) {
 	FILE *fload = NULL;
 	do {
 		afprintf(fout, "Path: ");
-		fgets(line, MAX_LINE_SIZE, fin);
-		if (strlen(line) == 1) {
+		get_line(fin, line);
+		if (ARG_LEN == 0) {
 			afprintf(fout, "Cancelled\n");
 			return;
 		}
-		size_t i = 0;
-		while (line[i] != '\n' && line[i] != '\0' && i < MAX_LINE_SIZE) i++;
-		line[i] = '\0';
-		fload = fopen(line, "r");
-		if (fload == NULL) { afprintf(fout, "Cannot open file '%s'\n", line); }
+		fload = fopen(line->str, "r");
+		if (fload == NULL) { afprintf(fout, "Cannot open file '"LINE_FMT"'\n", LINE_PARG(line)); }
 		else { break; }
 	}
 	while (retries--);
 	if (retries == 0) { afprintf(ferr, "Max retries exceeded\n"); return; }
-	afprintf(fout, "Loading table from '%s'\n", line);
+	afprintf(fout, "Loading table from '"LINE_FMT"'\n", LINE_PARG(line));
 	load_table(fload, ferr, table, line);
 	afprintf(fout, "Loaded table\n");
 	if (fload != NULL) fclose(fload);
@@ -304,14 +298,13 @@ int main(int argc, char *argv[]) {
 	FILE *fout = stdout; // no free
 	FILE *ferr = stderr; // no free
 	table_t *table = NULL;
-	char line[MAX_LINE_SIZE] = {0};
+	line_t line0 = {0};
+	line_t *line = &line0;
 	if (!(argc > 1 && strcmp(argv[1], "--no-menu") == 0)) print_menu(fout);
 	int retries = 3;
 	while (1) {
 		afprintf(fout, "> ");
-		if (fgets(line, MAX_LINE_SIZE, fin) == NULL) {
-			// don't think it's actually possible with stack-allocated `line`
-			// edit: possible when redirecting stdin
+		if (get_arg(fin, line) == 0) {
 			afprintf(ferr, "Get line error (fgets returned NULL)\n");
 			break;
 		}
@@ -321,7 +314,7 @@ int main(int argc, char *argv[]) {
 		else if (feof(fin)) {
 			afprintf(ferr, "EOF\n"); break;
 		}
-		else if (line[0] == '\n') {continue;}
+		else if (ARG_LEN == 0) {continue;}
 		else if (PROMPT("q") || PROMPT("quit") || PROMPT("exit")) {
 			afprintf(fout, "Quitting\n"); break;
 		}
@@ -353,17 +346,35 @@ int main(int argc, char *argv[]) {
 		else if (PROMPT("l") || PROMPT("load") || PROMPT("import")) {
 			import_table(fin, fout, ferr, &table, line, retries);
 		}
+		else if (PROMPT("t_s")) {
+			afprintf(fout, "Line: ");
+			if (get_line(fin, line)) {
+				afprintf(fout, LINE_FMT, LINE_PARG(line));
+			}
+		}
+		else if (PROMPT("t_u")) {
+			size_t testu;
+			afprintf(fout, "Uint: ");
+			get_arg(fin, line);
+			if (lparse_uint(line, &testu)) afprintf(fout, "%zu\n", testu);
+		}
 		else if (PROMPT("t_i")) {
 			int64_t testi;
 			afprintf(fout, "Int: ");
-			fgets(line, MAX_LINE_SIZE, fin);
-			if (parse_int(line, &testi)) afprintf(fout, "%zd\n", testi);
+			get_arg(fin, line);
+			if (lparse_int(line, &testi)) afprintf(fout, "%zd\n", testi);
 		}
 		else if (PROMPT("t_f")) {
 			double testf;
 			afprintf(fout, "Float: ");
-			fgets(line, MAX_LINE_SIZE, fin);
-			if (parse_float(line, &testf)) afprintf(fout, "%f\n", testf);
+			get_arg(fin, line);
+			if (lparse_float(line, &testf)) afprintf(fout, "%f\n", testf);
+		}
+		else if (PROMPT("t_b")) {
+			bool testb;
+			afprintf(fout, "Bool: ");
+			get_arg(fin, line);
+			if (lparse_bool(line, &testb)) afprintf(fout, testb ? "TRUE\n" : "FALSE\n");
 		}
 		else if (PROMPT("t_c")) {
 			for (unsigned int i = 0; i < 100; i++) {
@@ -375,7 +386,7 @@ int main(int argc, char *argv[]) {
 			break;
 		}
 		else {
-			afprintf(fout, "Unknown command: %s", line);
+			afprintf(fout, "Unknown command: " LINE_FMT"\n", LINE_PARG(line));
 		}
 	}
 	if (table != NULL) table_free(table);
