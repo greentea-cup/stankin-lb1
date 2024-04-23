@@ -13,6 +13,16 @@
 ###### Visual Studio
 Открыть папку как решение -> выбрать конфигурацию `x64 Release` -> запустить.
 ###### Вручную
+! Команды сборки необходимо запускать из `Developer Command Prompt` или `Developer PowerShell`
+64 бит
 ```cmd
-# TBD
+.\regen_cmake.bat
+.\build.bat
+.\Build\x64-release\app.exe <...>
+```
+32 бит
+```cmd
+.\regen_cmake32.bat
+.\build32.bat
+.\Build\x86-release\app.exe <...>
 ```
