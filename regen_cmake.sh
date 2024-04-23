@@ -1,9 +1,8 @@
 #!/bin/sh
 
-export CC=clang CXX=clang
-# export CC=gcc CXX=g++
-# for msvc use regen_cmake.bat or VS
-
+export CC=${CC:-clang} CXX=${CXX:-clang}
+echo "Using CC=$CC"
+echo "Using CXX=$CXX"
 BUILD_TYPE="${BUILD_TYPE:-${1:-Release}}"
 echo "Using BUILD_TYPE=$BUILD_TYPE"
 export EXPORT_COMPILE_COMMANDS="${EXPORT_COMPILE_COMMANDS:-$CCMDS}"
@@ -13,12 +12,13 @@ fi
 echo "Using EXPORT_COMPILE_COMMANDS=$EXPORT_COMPILE_COMMANDS"
 
 # clear cache
-rm -rf Build compile_commands.json
-# regen for both Release and Debug configurations
-cmake -S . -B Build/Release -DCMAKE_BUILD_TYPE=Release
-cmake -S . -B Build/Debug -DCMAKE_BUILD_TYPE=Debug
-# to regen only for specified configuration:
-# cmake -S . -B Build/$BUILD_TYPE -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+echo "Clear build cache"
+rm -rf Build/Release Build/Debug compile_commands.json
+# regen for both Release and Debug presets
+echo "Generating Release"
+cmake --preset Release
+echo "Generating Debug"
+cmake --preset Debug
 
 if [ ! -z "$EXPORT_COMPILE_COMMANDS" ]; then
 	echo "Making symlink to Build/$BUILD_TYPE/compile_commands.json"

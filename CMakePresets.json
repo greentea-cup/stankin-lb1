@@ -1,22 +1,50 @@
 {
     "version": 3,
     "configurePresets": [
-        {
-            "name": "windows-base",
-            "hidden": true,
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/Build/${presetName}",
-            "installDir": "${sourceDir}/BUild/${presetName}",
-            "cacheVariables": {
-                "CMAKE_C_COMPILER": "cl.exe",
-                "CMAKE_CXX_COMPILER": "cl.exe"
-            },
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Windows"
-            }
-        },
+		{
+			"name": "linux-base",
+			"hidden": true,
+			"generator": "Unix Makefiles",
+			"binaryDir": "${sourceDir}/Build/${presetName}",
+			"installDir": "${sourceDir}/Build/${presetName}",
+			"condition": {
+				"type": "notEquals",
+				"lhs": "${hostSystemName}",
+				"rhs": "Windows"
+			}
+		},
+		{
+			"name": "windows-base",
+			"hidden": true,
+			"generator": "Ninja",
+			"binaryDir": "${sourceDir}/Build/${presetName}",
+			"installDir": "${sourceDir}/BUild/${presetName}",
+			"cacheVariables": {
+				"CMAKE_C_COMPILER": "cl.exe",
+				"CMAKE_CXX_COMPILER": "cl.exe"
+			},
+			"condition": {
+				"type": "equals",
+				"lhs": "${hostSystemName}",
+				"rhs": "Windows"
+			}
+		},
+		{
+			"name": "Debug",
+			"displayName": "Linux Debug",
+			"inherits": "linux-base",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug"
+			}
+		},
+		{
+			"name": "Release",
+			"displayName": "Linux Release",
+			"inherits": "linux-base",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release"
+			}
+		},
         {
             "name": "x64-debug",
             "displayName": "x64 Debug",
@@ -25,17 +53,17 @@
                 "value": "x64",
                 "strategy": "external"
             },
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
-            }
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug"
+			}
         },
         {
             "name": "x64-release",
             "displayName": "x64 Release",
             "inherits": "x64-debug",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
-            }
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release"
+			}
         },
         {
             "name": "x86-debug",
@@ -45,17 +73,65 @@
                 "value": "x86",
                 "strategy": "external"
             },
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
-            }
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug"
+			}
         },
         {
             "name": "x86-release",
             "displayName": "x86 Release",
             "inherits": "x86-debug",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
-            }
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release"
+			}
         }
-    ]
+    ],
+	"buildPresets": [
+		{
+			"name": "linux-base",
+			"hidden": true
+		},
+		{
+			"name": "windows-base",
+			"hidden": true
+		},
+		{
+			"name": "Release",
+			"inherits": "linux-base",
+			"displayName": "Linux Release",
+			"configurePreset": "Release",
+			"configuration": "Release"
+		},
+		{
+			"name": "Debug",
+			"inherits": "linux-base",
+			"displayName": "Linux Debug",
+			"configurePreset": "Debug",
+			"configuration": "Debug"
+		},
+		{
+			"name": "x64-release",
+			"inherits": "windows-base",
+			"configurePreset": "x64-release",
+			"configuration": "Release"
+		},
+		{
+			"name": "x64-debug",
+			"inherits": "windows-base",
+			"configurePreset": "x64-debug",
+			"configuration": "Debug"
+		},
+		{
+			"name": "x86-release",
+			"inherits": "windows-base",
+			"configurePreset": "x86-release",
+			"configuration": "Release"
+		},
+		{
+			"name": "x86-debug",
+			"inherits": "windows-base",
+			"configurePreset": "x86-debug",
+			"configuration": "Debug"
+		}
+	]
 }
