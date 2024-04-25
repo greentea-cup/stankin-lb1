@@ -145,7 +145,11 @@ int get_str(FILE *fin, FILE *fout, FILE *ferr, char *line, char const *prompt, c
 
 #define DIGITS "0123456789"
 #define ALPH_EN_LOW "abcdefghijklmnopqrstuvwxyz"
-#define ALPH_EN_UPP "abcdefghijklmnopqrstuvwxyz"
+#define ALPH_EN_UPP "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+#define ALPH_EN ALPH_EN_LOW ALPH_EN_UPP
+#define ALPH_RU_LOW "абвгдеёжзийклмнопрстуфхцчшщъыьэюя"
+#define ALPH_RU_UPP "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
+#define ALPH_RU ALPH_RU_LOW ALPH_RU_UPP
 
 int get_id(FILE *fin, FILE *fout, FILE *ferr, char *line, char const *prompt, char const *onerror,
 	int interactive, size_t *out_result) {
@@ -171,7 +175,7 @@ int get_c3(FILE *fin, FILE *fout, FILE *ferr, char *line, char const *prompt, ch
 	int interactive, char *out_result) {
 	return get_str(fin, fout, ferr, line, prompt != NULL ? prompt : "c3[char 16]: ",
 			onerror != NULL ? onerror : "c3: Max length: 16; Valid chars are 0-9 a-z A-Z\n", interactive,
-			DIGITS ALPH_EN_LOW ALPH_EN_UPP, 16, out_result);
+			DIGITS ALPH_EN ALPH_RU, 16, out_result);
 }
 
 int get_c4(FILE *fin, FILE *fout, FILE *ferr, char *line, char const *prompt, char const *onerror,

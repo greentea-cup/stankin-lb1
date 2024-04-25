@@ -11,7 +11,9 @@ static size_t npow2(size_t v) {
 	v |= v >> 4;
 	v |= v >> 8;
 	v |= v >> 16;
+#ifndef _MSC_VER
 	v |= v >> 32;
+#endif
 	v++;
 	return v;
 }

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8.0)
+cmake_minimum_required(VERSION 3.15.0)
 
 if ($ENV{EXPORT_COMPILE_COMMANDS})
     # ccls needs compile_commands.json to work
@@ -22,8 +22,11 @@ if (CMAKE_C_COMPILER_ID STREQUAL "Clang")
 elseif (CMAKE_C_COMPILER_ID STREQUAL "GNU")
     target_compile_options(${MAIN_TARGET} PRIVATE -Wall -Wextra -Wpedantic -O3 $<$<CONFIG:Debug>:-pg>)
 elseif (CMAKE_C_COMPILER_ID STREQUAL "MSVC")
-	target_compile_options(${MAIN_TARGET} PRIVATE /Wall /Oi $<$<CONFIG:Release>:/O2>)
-    target_compile_definitions(${MAIN_TARGET} PRIVATE _CRT_SECURE_NO_WARNINGS)
+	# message(FATAL_ERROR "NO GOD PLEASE NO! use clang or minGW if you are on windows")
+	target_compile_options(${MAIN_TARGET} PRIVATE /J /W4 /Oi $<$<CONFIG:Release>:/O2>)
+endif()
+if (WIN32)
+	target_compile_definitions(${MAIN_TARGET} PRIVATE _CRT_SECURE_NO_WARNINGS)
 endif()
 
 if ($ENV{COLOR_DIAGNOSTICS})

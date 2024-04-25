@@ -52,8 +52,13 @@ int delete_row(FILE *fin, FILE *fout, FILE *ferr, table_t *table, char *line, in
 	return 1;
 }
 
+#ifdef _MSC_VER
+#define ROW_HUMAN_FORMAT "%zd\t%lld\t%f\t'%s'\t%s\t'%s'\n"
+#define ROW_DUMP_FORMAT "%zd\n%lld\n%f\n%s\n%d\n%s\n"
+#else
 #define ROW_HUMAN_FORMAT "%zu\t%zd\t%f\t'%s'\t%s\t'%s'\n"
 #define ROW_DUMP_FORMAT "%zu\n%zd\n%f\n%s\n%d\n%s\n"
+#endif
 #define ROW_HEADER "id\tc1\tc2\tc3\tc4\tc5\n"
 
 int print_table(FILE *fout, FILE *ferr, table_t const *table, int dump) {
@@ -92,7 +97,7 @@ int print_matching_rows(FILE *fout, FILE *ferr, table_t const *table, table_find
 }
 
 int load_table(FILE *fin, FILE *ferr, table_t **out_table, char *line) {
-	if (out_table == NULL) return 0;
+	if (fin == NULL || out_table == NULL) return 0;
 	size_t table_len = 0, table_next_id = 0;
 	fgets(line, MAX_LINE_SIZE, fin);
 	parse_uint(line, &table_len);
@@ -101,7 +106,10 @@ int load_table(FILE *fin, FILE *ferr, table_t **out_table, char *line) {
 	table_t *table = table_new(table_len);
 	table->next_id = table_next_id;
 	for (size_t i = 0; i < table_len; i++) {
-		add_row(fin, NULL, ferr, table, line, 0);
+		if (add_row(fin, NULL, ferr, table, line, 0) == 0) {
+			table_free(table);
+			return 0;
+		}
 	}
 	*out_table = table;
 	return 1;
@@ -219,6 +227,10 @@ void filter_table(FILE *fin, FILE *fout, FILE *ferr, table_t const *table, char 
 
 void sort_table(FILE *fin, FILE *fout, FILE *ferr, table_t const *table, char *line,
 	int retries) {
+	if (table == NULL) {
+		afprintf(ferr, "No table\n");
+		return;
+	}
 	table_sort_t sortspec = {0};
 	size_t colnum;
 	get_uint(fin, fout, ferr, line,
@@ -293,8 +305,12 @@ void import_table(FILE *fin, FILE *fout, FILE *ferr, table_t **table, char *line
 	while (retries--);
 	if (retries == 0) { afprintf(ferr, "Max retries exceeded\n"); return; }
 	afprintf(fout, "Loading table from '%s'\n", line);
-	load_table(fload, ferr, table, line);
-	afprintf(fout, "Loaded table\n");
+	if (load_table(fload, ferr, table, line)) {
+		afprintf(fout, "Loaded table\n");
+	}
+	else {
+		afprintf(ferr, "Cannot load table\n");
+	}
 	if (fload != NULL) fclose(fload);
 }
 
@@ -357,7 +373,11 @@ int main(int argc, char *argv[]) {
 			int64_t testi;
 			afprintf(fout, "Int: ");
 			fgets(line, MAX_LINE_SIZE, fin);
+#ifdef _MSC_VER
+			if (parse_int(line, &testi)) afprintf(fout, "%lld\n", testi);
+#else
 			if (parse_int(line, &testi)) afprintf(fout, "%zd\n", testi);
+#endif
 		}
 		else if (PROMPT("t_f")) {
 			double testf;
@@ -373,6 +393,13 @@ int main(int argc, char *argv[]) {
 		else if (PROMPT("t_q")) {
 			// silent quit
 			break;
+		}
+		else if (PROMPT("t_a")) {
+			afprintf(fout, ": ");
+			fgets(line, MAX_LINE_SIZE, fin);
+			for (size_t i = 0; i < MAX_LINE_SIZE && line[i] != '\n' && line[i] != '\0'; i++) {
+				afprintf(fout, "[%4zu] %c - %d\n", i, line[i], line[i]);
+			}
 		}
 		else {
 			afprintf(fout, "Unknown command: %s", line);

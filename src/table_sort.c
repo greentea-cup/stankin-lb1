@@ -10,7 +10,8 @@ typedef int (*cmp_func)(void const *, void const *);
 	cmp_##field##_##type(void const *a0, void const *b0) { \
 		dbrow_t const *a = (dbrow_t const *)a0; \
 		dbrow_t const *b = (dbrow_t const *)b0; \
-		return (mul) * ( ((a->field - b->field) > 0) - ((a->field - b->field) < 0) ); \
+		int gt = a->field > b->field, lt = a->field < b->field; \
+		return (mul) * ( gt - lt ); \
 	}
 #define STR_CMP(field, type, mul, maxlen) static int cmp_##field##_##type(void const *a, void const *b) { \
 		char const *str1 = ( (dbrow_t const *)a )->field; \
