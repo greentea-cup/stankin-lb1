@@ -22,6 +22,7 @@
 #endif
 
 #define DIGITS L"0123456789"
+#define PUNCTS L".,;:?!@#()$%^&*`~'\"<>/\\[]{}|+-=_№"
 #define ALPH_EN_LOW L"abcdefghijklmnopqrstuvwxyz"
 #define ALPH_EN_UPP L"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 #define ALPH_EN ALPH_EN_LOW ALPH_EN_UPP

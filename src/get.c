@@ -174,7 +174,8 @@ int get_c3(FILE *fin, FILE *fout, FILE *ferr, wchar_t *line, wchar_t const *prom
 	wchar_t const *onerror,
 	int interactive, wchar_t *out_result) {
 	return get_str(fin, fout, ferr, line, prompt != NULL ? prompt : L"c3[wchar_t 16]: ",
-			onerror != NULL ? onerror : L"c3: Max length: 16; Valid chars are 0-9 a-z A-Z\n", interactive,
+			onerror != NULL ? onerror : L"c3: Max length: 16; Valid chars are 0-9 a-z A-Z а-я А-Я\n",
+			interactive,
 			DIGITS ALPH_EN ALPH_RU, 16, out_result);
 }
 
@@ -190,6 +191,7 @@ int get_c5(FILE *fin, FILE *fout, FILE *ferr, wchar_t *line, wchar_t const *prom
 	wchar_t const *onerror,
 	int interactive, wchar_t *out_result) {
 	return get_str(fin, fout, ferr, line, prompt != NULL ? prompt : L"c5[wchar_t 32]: ",
-			onerror != NULL ? onerror : L"c5: Max length: 31; Valid chars are 0-9 a-z A-Z \\s\n", interactive,
-			DIGITS ALPH_EN_LOW ALPH_EN_UPP L" ", 32, out_result);
+			onerror != NULL ? onerror : L"c5: Max length: 31; Valid chars are 0-9 a-z A-Z а-я А-Я\\s\n",
+			interactive,
+			L" " PUNCTS DIGITS ALPH_EN ALPH_RU, 32, out_result);
 }
