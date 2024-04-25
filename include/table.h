@@ -4,25 +4,26 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include <wchar.h>
 
 typedef struct {
 	size_t id;
 	int64_t c1;
 	double c2; // todo: find some float64_t
-	char c3[17];
+	wchar_t c3[17];
 	bool c4;
-	char c5[33];
+	wchar_t c5[33];
 } dbrow_t;
 
-#define ROW_ARG(row) row.id, row.c1, row.c2, row.c3, row.c4 ? "TRUE" : "FALSE", row.c5
+#define ROW_ARG(row) row.id, row.c1, row.c2, row.c3, row.c4, row.c5
 
 typedef union {
 	size_t id;
 	int64_t c1;
 	double c2;
-	char c3[17];
+	wchar_t c3[17];
 	bool c4;
-	char c5[33];
+	wchar_t c5[33];
 } dbrow_u;
 
 typedef struct {

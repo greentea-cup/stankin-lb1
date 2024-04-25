@@ -14,9 +14,9 @@ typedef int (*cmp_func)(void const *, void const *);
 		return (mul) * ( gt - lt ); \
 	}
 #define STR_CMP(field, type, mul, maxlen) static int cmp_##field##_##type(void const *a, void const *b) { \
-		char const *str1 = ( (dbrow_t const *)a )->field; \
-		char const *str2 = ( (dbrow_t const *)b )->field; \
-		return (mul) * strncmp(str1, str2, maxlen); \
+		wchar_t const *str1 = ( (dbrow_t const *)a )->field; \
+		wchar_t const *str2 = ( (dbrow_t const *)b )->field; \
+		return (mul) * wcsncmp(str1, str2, maxlen); \
 	}
 #define ASC(field) CMP(field, asc, +1)
 #define DESC(field) CMP(field, desc, -1)

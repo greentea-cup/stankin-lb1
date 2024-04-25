@@ -62,14 +62,14 @@ int table_find_first(table_t const *table, table_find_t findspec, size_t *out_id
 		&& (TFF_ROW(col) <= TFF_DATA2(col))),\
 )
 #define TFF_STR_EQ(col) TFF_LOOP( \
-	((a == b) && (strncmp(str1, str2, a) == 0)), \
-	char *str1 = TFF_ROW(col); char *str2 = TFF_DATA1(col); \
-	size_t a = strlen(str1); size_t b = strlen(str2); \
+	((a == b) && (wcsncmp(str1, str2, a) == 0)), \
+	wchar_t *str1 = TFF_ROW(col); wchar_t *str2 = TFF_DATA1(col); \
+	size_t a = wcslen(str1); size_t b = wcslen(str2); \
 )
 #define TFF_STR_NEQ(col) TFF_LOOP( \
-	((a != b) || (strncmp(str1, str2, a) != 0)), \
-	char *str1 = TFF_ROW(col); char *str2 = TFF_DATA1(col); \
-	size_t a = strlen(str1); size_t b = strlen(str2); \
+	((a != b) || (wcsncmp(str1, str2, a) != 0)), \
+	wchar_t *str1 = TFF_ROW(col); wchar_t *str2 = TFF_DATA1(col); \
+	size_t a = wcslen(str1); size_t b = wcslen(str2); \
 )
 	switch (findspec.column) {
 	default: return 0;
