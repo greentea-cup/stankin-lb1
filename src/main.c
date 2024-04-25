@@ -365,7 +365,6 @@ int main(int argc, char *argv[]) {
 	wchar_t line[MAX_LINE_SIZE] = {0};
 	if (!(argc > 1 && strcmp(argv[1], "--no-menu") == 0)) print_menu(fout);
 	int retries = 3;
-	afprintf(fout, WSTR_FMT L"\n", DIGITS ALPH_EN ALPH_RU);
 	while (1) {
 		afprintf(fout, L"> ");
 		if (fgetws(line, MAX_LINE_SIZE, fin) == NULL) {
